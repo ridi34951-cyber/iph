@@ -1,0 +1,36 @@
+GyroLock revision notes
+
+Changes in this source revision:
+- Added an iPhone-inspired centered circular shutter control and a 0.5× zoom control. It uses CameraX's reported minimum zoom ratio; actual ultrawide support depends on the phone exposing its ultrawide field of view through the selected back camera.
+- Zoom transitions now animate smoothly between the current and selected ratio (approximately 180–420 ms), rather than jumping instantly.
+- Opening video motion blur now fades out over 0.12 seconds. This is a video-renderer effect only; the still photo remains on the independent ImageCapture path and is not zoomed or blurred by this shader.
+- Video-only crop is ratio-specific: 3:4 uses a modest 1.07× safety crop; 9:16 uses about 1.015×. The still JPEG is not processed by this renderer.
+- Existing 3:4 and 9:16 Motion Photo output selection remains available.
+- Existing stabilization, photo/Motion Photo writing, and build workflow are otherwise retained.
+
+Important limitations:
+- This is Android source, not a prebuilt APK. It has not been compiled or tested on the target Samsung/Oppo device in this environment.
+- 0.5× is available only if CameraX reports a minimum zoom ratio below 1.0 for the bound back camera. Some phones expose ultrawide as a separate physical camera and may require explicit physical-camera selection; this UI cannot guarantee switching lenses on every device.
+- Zoom transition animation and source changes require on-device testing.
+
+
+Revision 3.0.18 (source edit)
+- Added a DIGITAL / OPTICAL lens-mode control.
+- DIGITAL mode tries to bind an independently exposed rear ultra-wide camera (detected from Camera2 focal-length metadata). When such a camera is available and the full use-case combination is supported, zoom is applied on that selected camera; the 0.5x UI maps to that camera's 1.0x zoom ratio.
+- OPTICAL mode uses CameraX's default rear logical camera, allowing the device HAL/CameraX to use optical multi-camera switching when supported.
+- If the vendor does not expose a separate ultra-wide camera, the app falls back to the default rear camera and explicitly warns that it cannot guarantee same-lens-only digital zoom.
+- Lens-mode changes stop and restart the rolling Motion Photo buffer before rebinding CameraX use cases, avoiding rebinding while a recording is active.
+- Zoom animation duration is extended for smoother transitions.
+- The project has not been built or device-tested in this environment; verify the GitHub Actions build and test lens behavior on the target phone. CameraX cannot guarantee identical physical-lens switching behavior across vendors.
+
+Revision 3.0.19 (stationary-jitter / flash recovery pass)
+- Gyro stabilization bias estimation now uses per-axis medians over the first 0.75 s instead of a short arithmetic mean, reducing contamination from a brief movement at recording start.
+- Increased gyro dead-band and added a near-rest vector gate before integration to avoid integrating small residual sensor noise into visible frame jitter. The live preview uses a corresponding near-rest gate.
+- In DIGITAL mode, the flash button remains available even if the separately bound ultra-wide reports no flash. Requesting flash then switches to OPTICAL if an available rear camera exposes a flash, and enables the photo flash on that camera. Flash remains unavailable when no rear camera reports flash support.
+- Not compiled or device-tested in this environment (Gradle is not installed here). Test still-photo flash in OPTICAL mode and record a stationary clip before judging stabilization; the gyro thresholds may need device-specific tuning.
+
+
+Revision 3.0.20 (conservative stationary safety gate)
+- Added a whole-clip gyro residual RMS check after initial bias removal. If motion energy is low, the output correction curve stays effectively zero instead of turning sensor noise into visible jitter.
+- Raised the preview dead-band and near-rest gate so small residual gyro noise cannot continuously translate/rotate the preview surface.
+- This deliberately favors a stable, minimally corrected stationary clip over aggressive correction when motion confidence is low. It still requires Android build and on-device testing; the threshold is conservative and may leave very subtle motion uncorrected.
